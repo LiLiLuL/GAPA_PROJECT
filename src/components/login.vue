@@ -83,6 +83,10 @@ export default {
                     let username = data.username;
                     this.$store.dispatch('UserLogin', token);
                     this.$store.dispatch('UserName', username);
+                    //存对象
+                    // localStorage.setItem('hou', JSON.stringify(info));
+                    //存字符串
+                    localStorage.setItem('name', username);
                     //跳到目标页
                     this.$router.push('index');
                 }else{

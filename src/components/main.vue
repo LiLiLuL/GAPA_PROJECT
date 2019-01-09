@@ -1,23 +1,18 @@
 <template>
 
   <el-container>
-    <el-header>
+    <el-header height="80px" style="padding:0px;">
         <Header></Header>
     </el-header>
-    <el-main>
-        <el-row>
-            <el-col :span="4"> <el-aside ><leftNav/></el-aside></el-col>
-            <el-col :span="18">
-                <div class="main">
-                    <Hello></Hello>
-                </div>
-            </el-col>
-            <el-col :span="2"><div class="right"></div></el-col>
-        </el-row>
+  <el-container>
+    <el-aside width="190px"><leftNav v-bind:data="data"></leftNav></el-aside>
+    <el-main>     
+         <Hello v-on:listenTochildEvent="showMsgFromChild"></Hello>   
+          <el-footer>
+            <p >&copy;Chenxq,2018/11/26</p>
+         </el-footer>   
     </el-main>
-    <el-footer>
-        <p >	&copy;Chenxq,2018/11/26</p>
-    </el-footer>
+  </el-container>
   </el-container>
 </template>
 
@@ -28,8 +23,15 @@ import LeftNav from './leftNav.vue'
 
 export default {
     components:{Hello,Header,LeftNav},
+    data(){
+      return {
+        data:[]
+      }
+    },
     methods:{
-
+       showMsgFromChild(data){
+         this.data=data;
+       }
     }
 }
 </script>

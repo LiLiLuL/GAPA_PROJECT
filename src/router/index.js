@@ -5,6 +5,8 @@ import Login from '@/components/login.vue'
 import Register from '@/components/register.vue'
 import ForgetPass from '@/components/forgetpass.vue'
 import UserCenter from '@/components/usercenter.vue'
+import SubmitTable from '@/components/submitMain.vue'
+import Image from '@/components/image.vue'
 import store from '@/store/index'
 
 Vue.use(Router)
@@ -49,6 +51,24 @@ const router = new Router({
       meta: {
         requiresAuth: true
       }
+    },
+    {
+      path: '/submit',
+      name: 'submit',
+      component: SubmitTable,
+      meta:{
+        requiresAuth: true
+      }
+
+    },
+    {
+      path: '/image',
+      name: 'image',
+      component: Image,
+      meta:{
+        requiresAuth: true
+      }
+
     }
   ]
 });

@@ -96,6 +96,7 @@ export default {
                     type: 'success',
                     message: '注册成功'
                     });
+                    this.$router.push('login');
                   } else {
                     this.$message({
                     type: 'error',

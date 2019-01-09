@@ -4,7 +4,7 @@
         <ul class="right">
             <li>
                 <i class="icon iconfont icon-ren "></i>
-                <a>欢迎您！{{$store.state.username}}</a>
+                <a>欢迎您！{{username}}</a>
             </li>
             <li>
                 <i class="icon iconfont icon-weibiaoti2fuzhi16 "></i>
@@ -22,7 +22,8 @@ import store from '@/store/index'
 export default {
     data(){
         return{
-            msg:'xiaoqing_chen'
+            msg:'xiaoqing_chen',
+            username:''
         }
     },
     store,
@@ -32,6 +33,10 @@ export default {
            this.$store.dispatch('UserLogin', token);
            this.$router.push('login')
         }
+    },
+    created(){
+       let name = localStorage.getItem('name');
+       this.username=name;
     }
 }
 </script>

@@ -9,6 +9,7 @@
             v-for="(tag,index) in selections" 
             type="success" 
             closable  
+            class="tagcheck"
             @close="handleClose(tag)">
             {{tag.name}}
         </el-tag>
@@ -22,6 +23,7 @@
             v-for="(tag,index) in baseGroup"
             type="info"
             v-on:click.native="handleTag(tag);handleProCategory(tag);filters(tag.id)"
+            class="tag"
             >
                {{tag.name}}
             </el-tag>
@@ -34,6 +36,7 @@
             :key="index"
             v-for="(tag,index) in baseOrganization"
             type="info"
+            class="tag"
             @click.native="handleTag(tag);handleOrganization(tag)"
             >
                {{tag.name}}
@@ -47,6 +50,7 @@
             :key="index"
             v-for="(tag,index) in factorySeparation"
             type="info"
+            class="tag"
             @click.native="handleTag(tag);handleFacCategory(tag)"
             >
                 {{tag.name}}
@@ -88,41 +92,38 @@
 <p style="height:2px;background:green" />
 <div class="table">
     <span class="my-options">
-        <el-button type="warning">导出为Excel</el-button>
-        <el-button type="success">导出为PDF</el-button>
+        <el-button type="warning"  @click="downloadExcel">导出为Excel</el-button>
+        <el-button type="success" @click="downloadExl">仅导出当前页为excel</el-button>
     </span>
     <div class="my-search">
           <el-input placeholder="请输入搜索内容" class="search-input" v-model="input23" ref="sea"></el-input>
           <el-button type="primary" icon="el-icon-search" @click="search_result()">搜索</el-button>
     </div>
+    <div >
     <el-table
         :data="subContents.slice((currentPage-1)*pageSize,currentPage*pageSize)"
-        stripe
-        style="width: 100%;"
+        stripe style="width: 100%;" height="500" id="content"
+        @cell-mouse-leave="cellMouseLeave"  @cell-mouse-enter="cellMouseEnter"
         :row-class-name="tableRowClassName"
+         :span-method="objectSpanMethod" :cell-class-name="tableRowClassName"
     >
         <el-table-column prop="productCategory" label="产品类型" width="150"></el-table-column>
         <el-table-column prop="organization" label="基地组织" width="150"></el-table-column>
         <el-table-column prop="factoryCategory" label="厂别" width="150"></el-table-column>
         <el-table-column prop="productNumber" v-if="show" label="产品型号" width="150"></el-table-column>
-         <el-table-column prop="new_date" label="日期" width="150"></el-table-column>
-        <el-table-column  label="M+1锁定规划">
-           <el-table-column prop="monplan"  label="月份"  width="120"> </el-table-column>
-        </el-table-column>
-        <el-table-column  label="基地月锁定规划">
-           <el-table-column prop="orgMonPlan"  label="月份"  width="120"> </el-table-column>
-        </el-table-column>
+        <el-table-column prop="new_date"  v-if="showDate" sortable label="日期" width="150"></el-table-column>
+        <el-table-column  label="M+1锁定规划" prop="monplan" width="140" sortable></el-table-column>
+        <el-table-column  label="基地月锁定规划" prop="orgMonPlan" width="150" sortable></el-table-column>
         <el-table-column  label="量产计划产出">
-            <el-table-column prop="planProduce" label="10月week1" width="120"></el-table-column>
-            <el-table-column prop="zip"   label="总计"    width="120"></el-table-column>
+            <el-table-column :key="index" v-if="getShow(index)" v-for="(col,index) in cols.plan" :prop="col.prop" :label="col.label"  width="120"></el-table-column>
+            <el-table-column prop="zip"   label="总计"    width="120" sortable></el-table-column>
         </el-table-column>
-         <el-table-column label="量产计划实际产出">
-            <el-table-column prop="realProduce" label="10月week1" width="120"></el-table-column>
-            <el-table-column prop="zip"   label="总计"    width="120"></el-table-column>
-        </el-table-column>
-       
-        <el-table-column prop="gap" label="GAP" width="150"></el-table-column>
-        <el-table-column prop="achievement" label="达成率" width="150"></el-table-column>
+        <el-table-column label="量产计划实际产出">
+            <el-table-column :key="index" v-if="getShow(index)" v-for="(col,index) in cols.real" :prop="col.prop" :label="col.label"  width="120" sortable></el-table-column>
+            <el-table-column prop="zip"   label="总计"    width="120" sortable></el-table-column>
+        </el-table-column>   
+        <el-table-column prop="gap" label="GAP" width="150" sortable></el-table-column>
+        <el-table-column prop="achievement" label="达成率" width="150" sortable></el-table-column>
         <el-table-column prop="reason" label="原因分析" width="150">
             <template slot-scope="scope">
                 <el-popover placement="bottom"  title=" " width="400" trigger="click"  >
@@ -134,10 +135,13 @@
             </template>
         </el-table-column>      
     </el-table>
+    </div>
     <div class="my-pagination">
         <el-pagination
             background
-            layout="prev, pager, next"
+            layout="total, sizes,prev, pager, next,jumper"
+            @size-change="handleSizeChange"
+            :page-sizes="pageSizes"
             :page-size="pageSize"
             :total="total"
             @current-change="current_change">
@@ -154,6 +158,9 @@
 import axios from 'axios';
 import qs from 'Qs';
 import myaxios from '../axios.js'
+import XLSX from 'xlsx'
+import FileSaver from 'file-saver'
+
 // 数组去重
 function unique(arr) {
     if (!Array.isArray(arr)) {
@@ -182,10 +189,22 @@ function subdate(arr){
     var days=diffDate/(1*24*60*60*1000);  
     return  days;
 }
+
 export default {
   name: 'Hello',
   data () {
     return {
+      showDate:true,
+      cols:{
+        plan: [
+        {prop: 'date_content', label: '月份'},
+        {prop: 'planProduce', label: '计划产出'},
+        ],
+        real: [
+        {prop: 'date_content', label: '月份'},
+        {prop: 'produce', label: '实际产出'},
+      ]
+      },
       styleObject:{
          display:''
       },
@@ -217,7 +236,7 @@ export default {
       selections:[],
       DateLength: '',
       radio: 1,
-      radio2:2,
+      radio2:1,
       input23:'',
       // 筛选完的结果数组
       subContents:[],
@@ -225,13 +244,116 @@ export default {
       startnum:0,
       endnum:1,
       pageSize:20,
+      pageSizes:[20,50,100,200],
       currentPage:1,
       total:0,
       tableData3: [],
-      reason:''
+      spanArr:[],
+      rowIndex:'-1',
+      hoverOrderArr: []
     }
   },
+  computed:{
+      // 模糊搜索
+      
+      tables () {
+        const search = this.search;
+        if (search) {
+          // filter() 方法创建一个新的数组，新数组中的元素是通过检查指定数组中符合条件的所有元素。
+          // 注意： filter() 不会对空数组进行检测。
+          // 注意： filter() 不会改变原始数组。
+          return this.subContents.filter(data => {
+            // some() 方法用于检测数组中的元素是否满足指定条件;
+            // some() 方法会依次执行数组的每个元素：
+            // 如果有一个元素满足条件，则表达式返回true , 剩余的元素不会再执行检测;
+            // 如果没有满足条件的元素，则返回false。
+            // 注意： some() 不会对空数组进行检测。
+            // 注意： some() 不会改变原始数组。
+            return Object.keys(data).some(key => {
+              // indexOf() 返回某个指定的字符在某个字符串中首次出现的位置，如果没有找到就返回-1；
+              // 该方法对大小写敏感！所以之前需要toLowerCase()方法将所有查询到内容变为小写。
+              return String(data[key]).toLowerCase().indexOf(search) > -1
+            })
+          })
+        }       
+        return this.subContents
+      }
+  },
+
     methods:{
+        sendToParent(){
+            this.$emit("listenTochildEvent",this.subContents)
+        },
+       
+        exportChooseExcel() { // 兼容ie10哦！
+            require.ensure([], () => {
+                const { export_json_to_excel } = require('../excel_plugin/Export2Excel'); // 引入文件
+                //消息號    PDF 生成批次號    保單號    客戶號    消息類型    業務分類    接收人類型    模板 ID    消息創建者    創建時間    狀態
+                const tHeader = ['消息號','基地组织']; //Excel的列名称信息定义
+                const filterVal = ['productCategory', 'organization']; //
+                const list =this.subContents; //这是表格中的数据内容 （需要导出的数据内容信息 tableData）
+                const data = this.formatJson(filterVal, list);
+                export_json_to_excel(tHeader, data, '列表excel'); //列头信息 数据内容 导出的excel文件名字
+                })
+                
+        },
+        formatJson(filterVal, jsonData) {
+                return jsonData.map(v => filterVal.map(j => v[j]))
+        },
+     
+        //导出为excel
+         exportExcel () {
+         var wb = XLSX.utils.table_to_book(document.querySelector('#content'))
+         var wbout = XLSX.write(wb, { bookType: 'xlsx', bookSST: true, type: 'array' })
+         try {
+             FileSaver.saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'sheetjs.xlsx')
+         } catch (e) { if (typeof console !== 'undefined') console.log(e, wbout) }
+         return wbout
+     },
+       downloadExcel(){
+           let formData=this.subContents
+           formData=JSON.stringify(formData);
+           axios.post('/server/download',formData,{
+               headers: { "Content-Type": "application/json;application/octet-stream" },
+               responseType: 'arraybuffer',
+           }).then(res=>{
+               let b = new Blob([res.data], { type: 'application/vnd.ms-excel' });            
+               let url = URL.createObjectURL(b);           
+                let link = document.createElement('a');            
+                link.download = 'Gap达成率.xls';            
+                link.href = url;            
+                link.click();
+           })
+
+       },
+        downloadExl() {
+                let wb = XLSX.utils.table_to_book(document.getElementById('content')),
+                    wopts = {
+                        bookType: 'xlsx',
+                        bookSST: false,
+                        type: 'binary'
+                    },
+                    wbout = XLSX.write(wb, wopts);
+
+               FileSaver.saveAs(new Blob([this.s2ab(wbout)], {
+                    type: "application/octet-stream;charset=utf-8"
+                }), "GAP达成率.xlsx");
+            },
+        s2ab(s) {
+            console.log(s.length);
+                if (typeof ArrayBuffer !== 'undefind') {
+                    var buf = new ArrayBuffer(s.length);
+                    var view = new Uint8Array(buf);
+                    for (var i = 0; i != s.length; ++i) view[i] = s.charCodeAt(i) & 0xFF;
+                    return buf;
+                } else {
+                    var buf = new Array(s.length);
+                    for (var i = 0; i != s.length; ++i) buf[i] = s.charCodeAt(i) & 0xFF;
+                    return buf;
+                }
+            },
+
+
         current_change:function(currentPage){
         this.currentPage = currentPage;
         },
@@ -323,23 +445,19 @@ export default {
         // 模糊搜索
         search_result(){
              this.search=this.$refs.sea.value;
-             console.log(this.search);
-             this.subContents=this.subContents.filter(items=>{
-                var searchRegex = new RegExp(this.search, 'i');
-                var arr=[];
-                for(var i= 0, j = items.length; i < j; i++){
-                    arr[i] = {};
-                    arr[i].contacters = [];
-                    for(var item = 0, len = items[i].contacters.length; item < len; item++){
-                        if(searchRegex.test(items[i].contacters[item].name) || searchRegex.test(items[i].contacters[item].enterpriseName) || searchRegex.test(items[i].contacters[item].phoneNumber) || searchRegex.test(items[i].contacters[item].uniqueID)){
-                            arr[i].firstLetter = items[i].firstLetter;
-                            arr[i].contacters.push(items[i].contacters[item]);
-                        }
-                    }
-                }
-                return arr;
-            });
-            console.log("222")
+             let all=this.subContents;
+            if(this.search!=""){
+              all= all.filter(data => {
+              return Object.keys(data).some(key => {
+                 return String(data[key]).toLowerCase().indexOf(this.search) > -1
+             })
+            })
+            this.subContents=all;
+            }else{
+                axios.get("/server/all").then(res=>{
+                    this.subContents=res.data;
+                })
+            }
         },
         // 过滤器，筛选条件
         filters(num){
@@ -357,6 +475,7 @@ export default {
         fenye(){
 
         },
+         handleSizeChange(val){ this.pageSize=val;},
         // 产品型号一列是否显示
         showColumn(){
             if(this.radio=="1"){
@@ -365,16 +484,45 @@ export default {
                 this.show=false;
             }
         },
+        getShow(index){
+           if(this.radio2===2||this.radio2===3){
+               console.log(index);
+               return true;
+           }else{
+               return false;
+           }
+        },
         // 以哪一种单位显示数据
         showMethod(){
+           
            if(this.radio2===1){
-               console.log("以天展示数据");
-               let arr=this.value6;
-               let days=subdate(arr);
-               console.log(days);
+               this.showDate=true;
+                axios.get('/server/all')
+                .then(response=>{
+                    console.log(response);
+                    let data=response.data;
+                    this.subContents=data;
+                    this.total=data.length;
+                    this.cols=[];
+                })
            }else if(this.radio2===2){
+               this.showDate=false;
+               axios.get('/server/datedef',{params:{"num":this.radio2}}).then(res=>{
+                   let data=res.data.data.result;
+                   this.subContents=data;
+               })
                console.log("以周为单位展示数据")
-           }else{
+           }else if(this.radio2===3){
+               this.showDate=false;
+               axios.get('/server/datedef',{params:{"num":this.radio2}}).then(res=>{
+                   let data=res.data.data.result;
+                   let arr=[];              
+                   for(let item in data){
+                        arr.push(data[item].date_content);
+                   }
+                   this.subContents=data;
+                   
+               })
                console.log("以月为单位展示数据")
            }
         },
@@ -387,7 +535,14 @@ export default {
         }
         return '';
         },
-    
+        check(){
+          let data=this.subContents;
+           data.forEach(function(v){
+                if(v.reason==null){
+                    v.reason="请输入要填写的值"
+                }
+            })
+        },
         //编辑原因列
         reason_editor(){
            console.log(this.reason);
@@ -403,12 +558,87 @@ export default {
               console.log(res);
 
           })
+        },
+           // 合并单元格
+      objectSpanMethod({row,column,rowIndex,columnIndex}) {
+          if(this.radio2===2||this.radio2===3){
+           if (columnIndex === 6||columnIndex===9 ) {
+          for (let i = 0; i < this.spanArr.length; i++) {
+            let element = this.spanArr[i];
+            for (let j = 0; j < element.length; j++) {
+              let item = element[j];
+              if (rowIndex == item) {
+                if (j == 0) {
+                  return {
+                    rowspan: element.length,
+                    colspan: 1
+                  }
+                } else if (j != 0) {
+                  return {
+                    rowspan: 0,
+                    colspan: 0
+                  }
+                }
+              }
+            }
+          }
         }
+      }
+      },
+        //合并随意行数
+        getOrderNumber(){
+            this.spanArr=[];
+            let OderObj={};
+            this.subContents.forEach((ele,index)=>{
+                ele.rowIndex=index;
+                if(OderObj[ele.date_content]){
+                    OderObj[ele.date_content].push(index)
+                }else{
+                    OderObj[ele.date_content]=[];
+                    OderObj[ele.date_content].push(index)
+                }
+            })
+            for(let k in OderObj){
+                if(OderObj[k].length>1){
+                    this.spanArr.push(OderObj[k])
+                }
+            }
+             console.log(this.spanArr)
+        },
+          tableRowClassName({row,rowIndex}) {
+        let arr = this.hoverOrderArr
+        for (let i = 0; i < arr.length; i++) {
+          if (rowIndex == arr[i]) {
+            return 'hovered-row'
+          }
+        }
+      },
 
-        
+
+      cellMouseEnter(row, column, cell, event) {
+        this.rowIndex = row.rowIndex;
+        this.hoverOrderArr = [];
+        this.spanArr.forEach(element => {
+            if (element.indexOf(this.rowIndex) >= 0) {
+              this.hoverOrderArr = element
+            }
+        })
+      },
+
+      cellMouseLeave(row, column, cell, event) {
+        this.rowIndex = '-1'
+        this.hoverOrderArr = [];
+      }
+       
     },
     updated:function(){
-        this.addData();      
+        this.addData();  
+        this.check(); 
+        this.getOrderNumber();
+        this.sendToParent();
+    },
+    mounted(){
+        this.getOrderNumber()
     },
     created(){
         axios.get('http://localhost:3333/report/all')
@@ -421,10 +651,9 @@ export default {
         .catch(error=>{
             console.log("error");
             console.log(error);
-        })
+        });     
     }
-    }
-    
+    }   
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
@@ -434,7 +663,7 @@ li{
 }
 a{
     text-decoration: none;
-    color:#2c3e50;
+    color:#1c7946;
 }
 
 .item ul{
@@ -486,4 +715,17 @@ a{
 .radio-label label{
     width:50px;
 }
+.tag:hover,
+.tag:focus,
+.tag:active{
+    background: #086d8b;
+    color:#fff;
+}
+.tagcheck{
+    background:rgba(219, 8, 15, 0.39);
+    color:#086d8b;
+}
+.el-table .hovered-row {
+      background: #03192e;
+ }
 </style>
